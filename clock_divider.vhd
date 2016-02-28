@@ -61,13 +61,5 @@ begin
 	end process;
    -- connect divider output with internal counter
 	div <= std_logic_vector(cnt);
-	--div(7) <= cnt(7);
-	--div(6) <= cnt(6);
-   --div(5) <= cnt(5);
-   --div(4) <= cnt(4);
-   --div(3) <= cnt(3);
-   --div(2) <= cnt(2);
-   --div(1) <= cnt(1);
-   --div(0) <= cnt(0);
 end rtl;
 
