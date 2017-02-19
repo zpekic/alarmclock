@@ -1,0 +1,1 @@
+-intstyle "ise" -incremental -o "C:/Users/zoltanp/Documents/HexCalc/alarmclock_maphung/alarmclock_isim_beh.exe" -prj "C:/Users/zoltanp/Documents/HexCalc/alarmclock_maphung/alarmclock_beh.prj" "work.alarmclock" 

@@ -34,70 +34,51 @@ entity counterwithlimit is
            clear : in  STD_LOGIC;
            up : in  STD_LOGIC;
            down : in  STD_LOGIC;
+			  set : in STD_LOGIC;
+			  set_value : in STD_LOGIC_VECTOR(3 downto 0);
            limit : in  STD_LOGIC_VECTOR (3 downto 0);
-           value : out  STD_LOGIC_VECTOR (3 downto 0);
-           is_zero : out  STD_LOGIC;
-           is_limit : out  STD_LOGIC);
+			  
+           out_count : out  STD_LOGIC_VECTOR (3 downto 0);
+           out_zero : out  STD_LOGIC;
+           out_limit : out  STD_LOGIC);
 end counterwithlimit;
 
 architecture Behavioral of counterwithlimit is
 
 	signal cnt: unsigned(3 downto 0);
-	signal maxval: unsigned(3 downto 0);
 
 begin
-	value(3) <= cnt(3);
-	value(2) <= cnt(2);
-	value(1) <= cnt(1);
-	value(0) <= cnt(0);
+	out_count <= std_logic_vector(cnt);	
+	out_zero <= '1' when cnt = X"0" else '0';
+	out_limit <= '1' when cnt = unsigned(limit) else '0';
 	
-	maxval(3) <= limit(3);
-	maxval(2) <= limit(2);
-	maxval(1) <= limit(1);
-	maxval(0) <= limit(0);
-	
-	compare_with_zero: process(cnt)
-	begin
-		if cnt = "0000" then
-			is_zero <= '1';
-		else 
-			is_zero <= '0';
-		end if;
-	end process;
-
-	compare_with_limit: process(cnt, maxval)
-	begin
-		if cnt = maxval then
-			is_limit <= '1';
-		else 
-			is_limit <= '0';
-		end if;
-	end process;
-	
-	count: process(clock, clear)
+	count: process(clock, clear, set, up, down)
 	begin
 		if clear = '1' then
 			cnt <= "0000";
 		else
-			if clock'event and clock = '1' then
-				if up = '1' then
-					if cnt = maxval then
-						cnt <= "0000";
-					else
-						cnt <= cnt + 1;
+			if (clock'event and clock = '1') then
+				if (set = '1') then
+					cnt <= unsigned(set_value); -- setting to a value keyed in
+				else
+					if up = '1' then
+						if cnt >= unsigned(limit) then
+							cnt <= "0000";
+						else
+							cnt <= cnt + 1;
+						end if;
 					end if;
-				end if;
-				if down = '1' then
-					if cnt = "0000" then
-						cnt <= maxval;
-					else 
-						cnt <= cnt - 1;
+					if down = '1' then
+						if cnt = "0000" then
+							cnt <= unsigned(limit);
+						else 
+							cnt <= cnt - 1;
+						end if;
 					end if;
 				end if;
 			end if;
 		end if;
 	end process;
-
 
 end Behavioral;
 

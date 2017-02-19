@@ -31,8 +31,9 @@ use IEEE.STD_LOGIC_1164.ALL;
 --use UNISIM.VComponents.all;
 
 entity converter24to12 is
-    Port ( select12hrmode : in  STD_LOGIC;
+    Port ( select_12hr : in  STD_LOGIC;
            hour24 : in  STD_LOGIC_VECTOR (7 downto 0);
+			  
            hour_ispm : out  STD_LOGIC;
            hour_12or24 : out  STD_LOGIC_VECTOR (7 downto 0));
 end converter24to12;
@@ -40,9 +41,9 @@ end converter24to12;
 architecture Behavioral of converter24to12 is
 
 begin
-	convert: process(select12hrmode, hour24)
+	convert: process(select_12hr, hour24)
 	begin
-		if (select12hrmode = '1') then
+		if (select_12hr = '1') then
 			-- convert to 12hr mode (note both input and outputs are BCD!)
 			case hour24 is
 				when "00000000" => -- 00 is 12am

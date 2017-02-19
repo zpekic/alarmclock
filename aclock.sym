@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<symbol version="7" name="aclock">
+    <symboltype>BLOCK</symboltype>
+    <timestamp>2016-11-13T18:35:57</timestamp>
+    <pin polarity="Input" x="0" y="-736" name="reset" />
+    <pin polarity="Input" x="0" y="-672" name="onehertz" />
+    <pin polarity="Input" x="0" y="-608" name="select_alarm" />
+    <pin polarity="Input" x="0" y="-544" name="enable_alarm" />
+    <pin polarity="Input" x="0" y="-480" name="select_12hr" />
+    <pin polarity="Input" x="0" y="-416" name="enable_set" />
+    <pin polarity="Input" x="0" y="-352" name="set_hr" />
+    <pin polarity="Input" x="0" y="-288" name="set_min" />
+    <pin polarity="Input" x="0" y="-224" name="set_inc" />
+    <pin polarity="Input" x="0" y="-160" name="set_dec" />
+    <pin polarity="Input" x="0" y="-96" name="key_hit" />
+    <pin polarity="Input" x="0" y="-32" name="key_code(3:0)" />
+    <pin polarity="Output" x="464" y="-736" name="is_pm" />
+    <pin polarity="Output" x="464" y="-512" name="alarm_active" />
+    <pin polarity="Output" x="464" y="-288" name="hrmin_bcd(15:0)" />
+    <pin polarity="Output" x="464" y="-64" name="debug_port(3:0)" />
+    <graph>
+        <rect width="336" x="64" y="-768" height="768" />
+        <attrtext style="alignment:BCENTER;fontsize:56;fontname:Arial" attrname="SymbolName" x="232" y="-776" type="symbol" />
+        <attrtext style="fontsize:24;fontname:Arial" attrname="PinName" x="72" y="-736" type="pin reset" />
+        <line x2="0" y1="-736" y2="-736" x1="64" />
+        <attrtext style="fontsize:24;fontname:Arial" attrname="PinName" x="72" y="-672" type="pin onehertz" />
+        <line x2="0" y1="-672" y2="-672" x1="64" />
+        <attrtext style="fontsize:24;fontname:Arial" attrname="PinName" x="72" y="-608" type="pin select_alarm" />
+        <line x2="0" y1="-608" y2="-608" x1="64" />
+        <attrtext style="fontsize:24;fontname:Arial" attrname="PinName" x="72" y="-544" type="pin enable_alarm" />
+        <line x2="0" y1="-544" y2="-544" x1="64" />
+        <attrtext style="fontsize:24;fontname:Arial" attrname="PinName" x="72" y="-480" type="pin select_12hr" />
+        <line x2="0" y1="-480" y2="-480" x1="64" />
+        <attrtext style="fontsize:24;fontname:Arial" attrname="PinName" x="72" y="-416" type="pin enable_set" />
+        <line x2="0" y1="-416" y2="-416" x1="64" />
+        <attrtext style="fontsize:24;fontname:Arial" attrname="PinName" x="72" y="-352" type="pin set_hr" />
+        <line x2="0" y1="-352" y2="-352" x1="64" />
+        <attrtext style="fontsize:24;fontname:Arial" attrname="PinName" x="72" y="-288" type="pin set_min" />
+        <line x2="0" y1="-288" y2="-288" x1="64" />
+        <attrtext style="fontsize:24;fontname:Arial" attrname="PinName" x="72" y="-224" type="pin set_inc" />
+        <line x2="0" y1="-224" y2="-224" x1="64" />
+        <attrtext style="fontsize:24;fontname:Arial" attrname="PinName" x="72" y="-160" type="pin set_dec" />
+        <line x2="0" y1="-160" y2="-160" x1="64" />
+        <attrtext style="fontsize:24;fontname:Arial" attrname="PinName" x="72" y="-96" type="pin key_hit" />
+        <line x2="0" y1="-96" y2="-96" x1="64" />
+        <attrtext style="fontsize:24;fontname:Arial" attrname="PinName" x="72" y="-32" type="pin key_code(3:0)" />
+        <rect width="64" x="0" y="-44" height="24" />
+        <line x2="0" y1="-32" y2="-32" x1="64" />
+        <attrtext style="alignment:RIGHT;fontsize:24;fontname:Arial" attrname="PinName" x="392" y="-736" type="pin is_pm" />
+        <line x2="464" y1="-736" y2="-736" x1="400" />
+        <attrtext style="alignment:RIGHT;fontsize:24;fontname:Arial" attrname="PinName" x="392" y="-512" type="pin alarm_active" />
+        <line x2="464" y1="-512" y2="-512" x1="400" />
+        <attrtext style="alignment:RIGHT;fontsize:24;fontname:Arial" attrname="PinName" x="392" y="-288" type="pin hrmin_bcd(15:0)" />
+        <rect width="64" x="400" y="-300" height="24" />
+        <line x2="464" y1="-288" y2="-288" x1="400" />
+        <attrtext style="alignment:RIGHT;fontsize:24;fontname:Arial" attrname="PinName" x="392" y="-64" type="pin debug_port(3:0)" />
+        <rect width="64" x="400" y="-76" height="24" />
+        <line x2="464" y1="-64" y2="-64" x1="400" />
+    </graph>
+</symbol>

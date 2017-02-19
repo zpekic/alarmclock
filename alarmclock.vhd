@@ -32,7 +32,7 @@ use IEEE.numeric_std.all;
 
 entity alarmclock is
 	port(
-		-- 100MHz on the Mercury board
+		-- 50MHz on the Mercury board
 		CLK: in std_logic;
 		-- Master reset button on Mercury board
 		USR_BTN: in std_logic; 
@@ -40,15 +40,15 @@ entity alarmclock is
 		-- SW0 - select alarm (on) or clock (off) to view or set
 		-- SW1 - enable alarm (on)
 		-- SW2 - 12hr mode (on), or 24hr mode (off)
-		-- SW3 - not used
-		-- SW4 - not used
+		-- SW3 - enable ADC display (on), or enable clock/alarm (off)
+		-- SW4 - keyboard mode, dec(on), hex(off)
 		-- SW5 - not used
-		-- SW6 - 7seg dimmer mode select
-		-- SW7 - 7seg dimmer mode select
+		-- SW6 - 7seg dimmer mode select (or ADC channel to display value)
+		-- SW7 - 7seg dimmer mode select (or ADC channel to display value)
 		-- dimmer mode -- SW7 -- SW6 --
-		-- off (blank)		on		 on
-		-- potentiometer  on 	 off
-		-- light sensor   off    on
+		-- potentiometer	on		 on
+		-- light sensor   on 	 off
+		-- temperature    off    on
 		-- on (max light) off    off
       -------------------------------	
 		SW: in std_logic_vector(7 downto 0); 
@@ -68,13 +68,22 @@ entity alarmclock is
 		-- dot on digit 2 is lit up - 1Hz blicking if clock or steady if alarm is displayed
 		DOT: out std_logic; 
 		-- 4 LEDs on Mercury board will "count" (alarm enabled but not triggered), "flash" (alarm triggered) or be off (alarm disabled)
+		--LED: out std_logic_vector(3 downto 0);
 		LED: out std_logic_vector(3 downto 0);
 		-- ADC interface
 		ADC_MISO: in std_logic;
 		ADC_MOSI: out std_logic;
 		ADC_SCK: out std_logic;
-		ADC_CSN: out std_logic
-		);
+		ADC_CSN: out std_logic;
+		-- PMOD interface (for hex keypad)
+		PMOD: inout std_logic_vector(7 downto 0)
+		-- VGA
+		--HSYNC: out std_logic;
+		--VSYNC: out std_logic;
+		--RED: out std_logic_vector(2 downto 0);
+		--GRN: out std_logic_vector(2 downto 0);
+		--BLU: out std_logic_vector(1 downto 0)
+	);
 end alarmclock;
 
 use work.clock_divider;
@@ -82,9 +91,11 @@ use work.mux16to4;
 use work.mux32to16;
 use work.fourdigitsevensegled;
 use work.counterwithlimit;
-use work.hourminbcd;
-use work.comparatorwithstate;
 use work.pwm10bit;
+use work.aclock;
+use work.PmodKYPD;
+use work.debouncer;
+use work.bin2bcd;
 
 architecture structural of alarmclock is
 
@@ -126,42 +137,6 @@ component fourdigitsevensegled is
 			 );
 end component;
 
-component counterwithlimit is
-    Port ( clock : in  STD_LOGIC;
-           clear : in  STD_LOGIC;
-           up : in  STD_LOGIC;
-           down : in  STD_LOGIC;
-           limit : in  STD_LOGIC_VECTOR (3 downto 0);
-           value : out  STD_LOGIC_VECTOR (3 downto 0);
-           is_zero : out  STD_LOGIC;
-           is_limit : out  STD_LOGIC
-			 );
-end component;
-
-component hourminbcd is
-    Port ( reset : in  STD_LOGIC;
-           sync : in  STD_LOGIC;
-			  pulse: in STD_LOGIC;
-           mininc : in  STD_LOGIC;
-           mindec : in  STD_LOGIC;
-           hourinc : in  STD_LOGIC;
-           hourdec : in  STD_LOGIC;
-			  mode_ampm: in STD_LOGIC;
-           bcdout : out  STD_LOGIC_VECTOR (15 downto 0);
-			  ispm: out STD_LOGIC
-			);
-end component;
-
-component comparatorwithstate is
-    Port ( a : in  STD_LOGIC_VECTOR (23 downto 0);
-           b : in  STD_LOGIC_VECTOR (23 downto 0);
-			  clock: in STD_LOGIC;
-           reset : in  STD_LOGIC;
-			  enable: in STD_LOGIC;
-           trigger : out  STD_LOGIC
-			);
-end component;
-
 component pwm10bit is
     Port ( clk : in  STD_LOGIC;
 			  adc_samplingrate: in STD_LOGIC;	
@@ -170,83 +145,175 @@ component pwm10bit is
 			  adc_mosi : out std_logic;         -- ADC SPI MOSI
 			  adc_cs   : out std_logic;         -- ADC SPI CHIP SELECT
 			  adc_clk  : out std_logic;         -- ADC SPI CLOCK
+			  adc_value: out std_logic_vector(15 downto 0);
+			  adc_valid: out std_logic;
            pwm_out : out  STD_LOGIC);
+end component;
+
+component aclock is
+    Port ( reset : in  STD_LOGIC;
+           onehertz : in  STD_LOGIC;
+
+			  select_alarm: in  STD_LOGIC;
+			  enable_alarm: in  STD_LOGIC;
+			  select_12hr: in  STD_LOGIC;
+			  enable_set: in  STD_LOGIC;			  
+
+           set_hr : in  STD_LOGIC;
+           set_min : in  STD_LOGIC;
+           set_inc : in  STD_LOGIC;
+           set_dec : in  STD_LOGIC;
+			  key_code : in STD_LOGIC_VECTOR(3 downto 0);
+			  key_hit : in STD_LOGIC;
+
+           hrmin_bcd : out  STD_LOGIC_VECTOR (15 downto 0);
+			  is_pm: out STD_LOGIC;
+           alarm_active : out  STD_LOGIC;
+			  debug_port: out STD_LOGIC_VECTOR(3 downto 0));
+end component;
+
+component PmodKYPD is
+    Port ( 
+           clk : in  STD_LOGIC;
+			  reset: in STD_LOGIC;
+			  bcdmode: in STD_LOGIC;
+           Col : out  STD_LOGIC_VECTOR (3 downto 0);
+			  Row : in  STD_LOGIC_VECTOR (3 downto 0);
+           entry : out  STD_LOGIC_VECTOR (15 downto 0);
+			  key_code : out STD_LOGIC_VECTOR(3 downto 0);
+			  key_down: out STD_LOGIC
+			 );
+end component;
+
+component debouncer is
+    Port ( clock : in  STD_LOGIC;
+           reset : in  STD_LOGIC;
+           signal_in : in  STD_LOGIC;
+           signal_out : out  STD_LOGIC);
+end component;
+
+component bin2bcd is
+    Port ( reset : in  STD_LOGIC;
+           clk : in  STD_LOGIC;
+           bcd_mode : in  STD_LOGIC;
+           input_ready : in  STD_LOGIC;
+           input : in  STD_LOGIC_VECTOR (15 downto 0);
+           output_ready : out  STD_LOGIC;
+           output : out  STD_LOGIC_VECTOR (19 downto 0);
+			  debug: out STD_LOGIC_VECTOR(3 downto 0));
 end component;
 
 -- common signals
 signal sel: std_logic_vector(1 downto 0);
 signal freq: std_logic_vector(3 downto 0);
 signal blinkhours, blinkminutes: std_logic; -- pulse if setting hours/mins
-signal minuteinc, minutedec: std_logic; 
-signal hourinc, hourdec: std_logic; -- signals that override regular time counting (to set hours and mins)
-signal resetall, resetseconds, resetbuzzer: std_logic;
-signal secup, minup: std_logic; -- sync signals
-signal bcd2display: std_logic_vector(15 downto 0);
+signal resetall: std_logic;
+signal onehertz: std_logic; -- sync signals
+signal bcd2display, aclock_bcd: std_logic_vector(15 downto 0);
 signal showdot: std_logic;
-signal ampm_mode: std_logic;
+signal is_pm: std_logic;
+signal buzz: std_logic;
+-- modes of operation
+signal select_alarm: std_logic;
+signal enable_alarm: std_logic;
+signal select_12hr: std_logic;
+signal mode_debug: std_logic;
+signal mode_operate: std_logic;
+
+-- ADC
+signal adc_valid: std_logic;
+signal adc_value: std_logic_vector(15 downto 0);
+signal adc_ready: std_logic;
+signal adc_output: std_logic_vector(19 downto 0);
+-- alarm
 signal showdot_ispm: std_logic;
-signal alarmled: std_logic_vector(3 downto 0);
+signal led4: std_logic_vector(3 downto 0);
 -- dimmer
-signal freq16, freq32: std_logic; -- use either to drive dimmer sample rate
+signal freq16, freq32, freq64, freq128: std_logic; -- use either to drive dimmer sample rate, keyboard etc.
 signal led_dimmer: std_logic;
 signal adc_to_pwm: std_logic;
 signal adc_channel: std_logic_vector(2 downto 0);
--- seconds signals
-signal sec0limit, sec1limit: std_logic;
-signal secvalue: std_logic_vector(7 downto 0);
--- clock signals
-signal clock_ispm: std_logic;
-signal clock_mode: std_logic;
-signal clock_bcd: std_logic_vector(15 downto 0);
-signal clock_mininc, clock_mindec, clock_hourinc, clock_hourdec: std_logic;
--- alarm signals
-signal alarm_ispm: std_logic;
-signal alarm_mode: std_logic;
-signal alarm_bcd: std_logic_vector(15 downto 0);
-signal alarm_mininc, alarm_mindec, alarm_hourinc, alarm_hourdec: std_logic;
-signal alarm_enable: std_logic;
-signal buzz: std_logic; -- means alarm is on!!
+-- kbd
+signal key_code: std_logic_vector(3 downto 0);
+signal key_down: std_logic;
+-- debug
+signal debug16: std_logic_vector(15 downto 0);
+signal debug4: std_logic_vector(3 downto 0);
+signal pushbutton: std_logic_vector(3 downto 0);
+signal debug_adc: unsigned(15 downto 0) := X"03e8";
 
 begin
 	-- reset signals
 	resetall <= USR_BTN;
-	resetseconds <= USR_BTN or minuteinc or minutedec; -- when setting minutes, keep seconds at 0
-   resetbuzzer <= USR_BTN or BTN(3) or BTN(2) or BTN(1) or BTN(0); -- any button push should kill the alarm
-   -- determine operation mode (display and setting)
-	alarm_mode <= SW(0);
-	clock_mode <= not alarm_mode;
-	alarm_enable <= SW(1);
-	ampm_mode <= SW(2);
+	-- mode
+	select_alarm <= SW(0);
+	enable_alarm <= SW(1);
+	select_12hr <= SW(2);
+	mode_debug <= SW(3);
+	mode_operate <= not mode_debug;
 	-- blink per second on the middle dot in clock mode, and keep it on in alarm mode
-	secup <= freq(3);
-	showdot <= (clock_mode and secup) or (alarm_mode);
+	onehertz <= (SW(5) and freq128) or ((not SW(5)) and freq(3));
+	showdot <= mode_operate and (((not select_alarm) and onehertz) or select_alarm);
 	-- show PM status on last dot
-	showdot_ispm <= (alarm_mode and alarm_ispm) or (clock_mode and clock_ispm);
-	-- signal to bump up clock minutes
-	minup <= sec1limit and sec0limit;
-	-- set time button signals
-	hourinc <= BTN(3) and (not BTN(2)) and (not BTN(1)) and BTN(0);
-	hourdec <= BTN(3) and (not BTN(2)) and BTN(1) and (not BTN(0));
-	minuteinc <= (not BTN(3)) and BTN(2) and (not BTN(1)) and BTN(0);
-	minutedec <= (not BTN(3)) and BTN(2) and BTN(1) and (not BTN(0));
-	-- driving the clock
-	clock_mininc <= clock_mode and minuteinc;
-	clock_mindec <= clock_mode and minutedec;
-	clock_hourinc <= clock_mode and hourinc;
-	clock_hourdec <= clock_mode and hourdec;
-	-- driving the alarm
-	alarm_mininc <= alarm_mode and minuteinc;
-	alarm_mindec <= alarm_mode and minutedec;
-	alarm_hourinc <= alarm_mode and hourinc;
-	alarm_hourdec <= alarm_mode and hourdec;
+	showdot_ispm <= mode_operate and is_pm;
 	-- add some blinking to when setting minutes or hours
 	blinkhours <= (BTN(3) and freq(2)) or not BTN(3);
 	blinkminutes <= (BTN(2) and freq(2)) or not BTN(2);
-	-- drive 7seg dimming
-	led_dimmer <= (not(SW(7)) and not(SW(6))) or (SW(7) and not(SW(6)) and adc_to_pwm) or (not(SW(7)) and SW(6) and adc_to_pwm);
-	adc_channel(0) <= SW(6);
-	adc_channel(1) <= SW(6);
-	adc_channel(2) <= SW(7);
+	-- driving the display mux
+	sel(0) <= freq128;
+	sel(1) <= freq64;
+	-- DIMMER (the mux generates the mapping of 2 switches to 3 out of 8 possible channels and the PWM signal routing)
+	dimmer_mux: mux16to4 port map (
+		a => "1000", -- full light on, adc channel is ignored
+		b(3) => adc_to_pwm,
+		b(2 downto 0) => "010", -- measure TEMP (adc channel 2)
+		c(3) => adc_to_pwm, -- measure LIGHT (adc channel 3)
+		c(2 downto 0) => "011", -- measure LIGHT (adc channel 3)
+		d(3) => adc_to_pwm, -- measure POT (adc channel 4)
+		d(2 downto 0) => "100", -- measure POT (adc channel 4)
+		
+		s => SW(7 downto 6),
+		
+		y(3) => led_dimmer,
+		y(2 downto 0) => adc_channel(2 downto 0)
+	);
+	-- DEBOUNCE the 4 push buttons
+	d0: debouncer port map (
+		reset => resetall,
+		clock => freq128,
+		signal_in => BTN(0),
+		signal_out => pushbutton(0)
+	);
+	d1: debouncer port map (
+		reset => resetall,
+		clock => freq128,
+		signal_in => BTN(1),
+		signal_out => pushbutton(1)
+	);
+	d2: debouncer port map (
+		reset => resetall,
+		clock => freq128,
+		signal_in => BTN(2),
+		signal_out => pushbutton(2)
+	);
+	d3: debouncer port map (
+		reset => resetall,
+		clock => freq128,
+		signal_in => BTN(3),
+		signal_out => pushbutton(3)
+	);
+	
+	-- EXPERIMENTAL VGA
+--	expvga: sr_ff port map (
+--		reset => resetall,
+--		clock => CLK,
+--		h_sync => HSYNC,
+--		v_sync => VSYNC,
+--		rgb(7 downto 6) => BLU(1 downto 0),
+--		rgb(5 downto 3) => GRN(2 downto 0),
+--		rgb(2 downto 0) => RED(2 downto 0)
+--	);
+
 	-- FREQUENCY GENERATOR
 	one_sec: clock_divider port map (
 								clock => CLK,
@@ -257,93 +324,61 @@ begin
 								div(4) => freq(0), -- 8Hz
 								div(3) => freq16,  -- 16Hz
 								div(2) => freq32,  -- 32Hz
-								div(1) => sel(1),  -- 64Hz
-								div(0) => sel(0)   -- 128Hz
+								div(1) => freq64,  -- 64Hz
+								div(0) => freq128  -- 128Hz
 												);
-	-- SECONDS
-	sec0: counterwithlimit port map (
-								clock => secup,
-								clear => resetseconds,
-								limit => "1001",
-								value => secvalue(3 downto 0),
-								up => '1',
-								down => '0',
-								is_limit => sec0limit
-									);					
-	sec1: counterwithlimit port map (
-								clock => secup,
-								clear => resetseconds,
-								limit => "0101",
-								value => secvalue(7 downto 4),
-								up => sec0limit,
-								down => '0',
-								is_limit => sec1limit
-									);					
-   -- CLOCK
-	clock: hourminbcd port map ( 
-			  reset => resetall,
-           sync => secup,
-			  pulse => minup,
-           mininc => clock_mininc,
-           mindec => clock_mindec,
-           hourinc => clock_hourinc,
-           hourdec => clock_hourdec,
-			  mode_ampm => ampm_mode,
-           bcdout => clock_bcd,
-			  ispm => clock_ispm
-			  );
-   -- ALARM
-	alarm: hourminbcd port map ( 
-			  reset => resetall,
-           sync => secup,
-			  pulse => '0',
-           mininc => alarm_mininc,
-           mindec => alarm_mindec,
-           hourinc => alarm_hourinc,
-           hourdec => alarm_hourdec,
-			  mode_ampm => ampm_mode,
-           bcdout => alarm_bcd,
-			  ispm => alarm_ispm
-			  );
-	-- COMPARATOR
-	buzzer: comparatorwithstate port map (
-				a(23 downto 8) => clock_bcd,
-				a(7 downto 0) => secvalue,
-				b(23 downto 8) => alarm_bcd,
-				b(7 downto 0) => "00000000",
-				clock => secup, -- check for alarm every sec, to make sure it is triggered as minute starts 
-				reset => resetbuzzer,
-				enable => alarm_enable,
-				trigger => buzz
-				);
+   -- CLOCK WITH ALARM
+   clockwithalarm: aclock Port map (
+							  reset => resetall,
+							  onehertz => onehertz,
+							  
+							  select_alarm => select_alarm,
+							  enable_alarm => enable_alarm,
+							  select_12hr => select_12hr,
+							  enable_set => mode_operate,			  
+
+							  set_hr => pushbutton(3),
+							  set_min => pushbutton(2),
+							  set_inc => pushbutton(1),
+							  set_dec => pushbutton(0),
+							  key_code => key_code,
+							  key_hit => key_down,
+							  
+							  hrmin_bcd => aclock_bcd,
+							  is_pm => is_pm,
+							  alarm_active => buzz--,
+							  --debug_port => debug4
+							 );
 	-- indicate alarm (flashing Mercury LEDs and nasty sound)
 	muxled: mux16to4 port map (
-								a => "0000",   -- alarm disabled, no buzz
+								a => debug4,   -- alarm disabled, no buzz, show debug bits
 								b => "1111",   -- alarm disabled, buzz - this should never happen! 
-								c => freq,  -- alarm enabled but not buzzing (counting lights)
-								d(3) => secup, -- alarm enabled and buzzing (all flashing)
-								d(2) => secup,
-								d(1) => secup,
-								d(0) => secup,
-								y => alarmled,
-								s(1) => alarm_enable,
+								c => freq,  	-- alarm enabled but not buzzing (counting lights)
+								d(3) => onehertz, -- alarm enabled and buzzing (all flashing)
+								d(2) => onehertz,
+								d(1) => onehertz,
+								d(0) => onehertz,
+								y => led4,
+								s(1) => enable_alarm,
 								s(0) => buzz
 									);
 	-- dim the LEDs just like the 7seg display
-	LED(3) <= adc_to_pwm and alarmled(3);
-	LED(2) <= adc_to_pwm and alarmled(2);
-	LED(1) <= adc_to_pwm and alarmled(1);
-	LED(0) <= adc_to_pwm and alarmled(0);
+   LED(3) <= adc_to_pwm and led4(3);
+   LED(2) <= adc_to_pwm and led4(2);
+   LED(1) <= adc_to_pwm and led4(1);
+   LED(0) <= adc_to_pwm and led4(0);
 	-- "stereo" alternating buzzing sound
-	AUDIO_OUT_L <= alarm_enable and buzz and ((secup and sel(1)) or ((not secup) and sel(0))); 
-	AUDIO_OUT_R <= alarm_enable and buzz and ((secup and sel(0)) or ((not secup) and sel(1)));
-   -- MULTIPLEXED DISPLAY
-	mux: mux32to16 port map (
-								a => clock_bcd,
-								b => alarm_bcd,
+	AUDIO_OUT_L <= SW(1) and buzz and ((onehertz and sel(1)) or ((not onehertz) and sel(0))); 
+	AUDIO_OUT_R <= SW(1) and buzz and ((onehertz and sel(0)) or ((not onehertz) and sel(1)));
+
+	-- MAIN DISPLAY MUX
+	dispmux: mux32to16 port map (
+								a => aclock_bcd,
+								b => debug16,
 								y => bcd2display,
-								s => alarm_mode
+								s => mode_debug
 									);
+									
 	display: fourdigitsevensegled port map ( 
 			  data => bcd2display,
            digsel => sel,
@@ -363,13 +398,63 @@ begin
    -- DIMMER converts ADC channel signal to pulse-width-modulated one to use for displays
    dimmer: pwm10bit Port map 
 		   ( clk => CLK,
-			  adc_samplingrate => sel(1), -- 64Hz sampling rate	
+			  adc_samplingrate => freq64, -- 64Hz sampling rate	
 			  adc_miso => ADC_MISO, -- ADC SPI MISO
 			  adc_mosi => ADC_MOSI, -- ADC SPI MOSI
 			  adc_cs   => ADC_CSN,  -- ADC SPI CHIP SELECT
 			  adc_clk  => ADC_SCK,  -- ADC SPI CLOCK
            adc_channel => adc_channel, -- select light (011) or potentiometer (100)
+			  adc_value => adc_value,
+			  adc_valid => adc_valid,
            pwm_out => adc_to_pwm
+			);
+			
+	-- Possibly convert ADC reading to BCD		
+	adc2bcd: bin2bcd Port map
+			( reset => resetall,
+           clk => CLK,
+           bcd_mode => SW(4),
+           input_ready => adc_valid,
+           input => adc_value, --std_logic_vector(debug_adc), --adc_value,
+           output_ready => adc_ready,
+           output => adc_output,
+			  debug => debug4
+	);
+	
+	--debug_adc <= X"00" & freq(3) & freq(2) & freq(1) & freq(0) & freq16 & freq32 & freq64 & freq128;
+	-- Increment ADC for debug purposes
+	--increment_adc: process(freq(2))
+	--begin
+	--	if (rising_edge(freq(2))) then
+	--		debug_adc <= debug_adc + 1;
+	--	end if;
+	--end process;
+	
+	-- Capture ADC reading for display
+	capture_adc: process(adc_ready)
+	begin
+		if (rising_edge(adc_ready)) then
+			debug16 <= adc_output(15 downto 0);
+		end if;
+	end process;
+	--debug4 <= "11" & adc_valid & adc_ready;
+	
+	-- KEYBOARD
+	kbd: PmodKYPD Port map
+			( clk => freq64, -- 64Hz, means each key is sampled at 4Hz rate (64/16)
+			  reset => resetall,
+			  bcdmode => SW(4),
+           Col(3) => PMOD(0),
+           Col(2) => PMOD(1),
+           Col(1) => PMOD(2),
+           Col(0) => PMOD(3),
+			  Row(3) => PMOD(4),
+			  Row(2) => PMOD(5),
+			  Row(1) => PMOD(6),
+			  Row(0) => PMOD(7),
+           --entry => debug16,
+			  key_code => key_code,
+			  key_down => key_down			  
 			);
 				
 end structural;

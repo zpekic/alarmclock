@@ -1,0 +1,8 @@
+[Inputs]
+reset
+clock
+[Outputs]
+h_sync
+v_sync
+=rgb[7:0]=
+[BiDir]

@@ -1,0 +1,7 @@
+work	"aclock.vhd"
+work	"bcd_counter.vhd"
+work	"comparatorwithstate.vhd"
+work	"converter24to12.vhd"
+work	"counterwithlimit.vhd"
+work	"hourminbcd.vhd"
+work	"mux32to16.vhd"

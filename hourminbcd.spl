@@ -1,0 +1,14 @@
+[Inputs]
+reset
+sync
+pulse
+set_hr
+set_min
+set_inc
+set_dec
+key_hit
+=key_code[3:0]=
+[Outputs]
+=bcdout[15:0]=
+=debug[3:0]=
+[BiDir]

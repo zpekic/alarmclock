@@ -37,7 +37,7 @@ entity clock_divider is
 end clock_divider;
 
 architecture rtl of clock_divider is
-	constant max_count: integer := 195312; -- 100MHz / 256-bit divider / 2 (this is a bit bad because it is rounded down!)
+	constant max_count: integer := 195312; -- 50MHz to 256Hz (this is a bit bad because it is rounded down!)
 	signal count: integer range 0 to max_count := 0; 
 	signal cnt: unsigned(7 downto 0);
 	

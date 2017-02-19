@@ -38,6 +38,8 @@ entity pwm10bit is
 			  adc_mosi : out std_logic;         -- ADC SPI MOSI
 			  adc_cs   : out std_logic;         -- ADC SPI CHIP SELECT
 			  adc_clk  : out std_logic;          -- ADC SPI CLOCK
+			  adc_value: out std_logic_vector(15 downto 0);
+			  adc_valid: out std_logic;
            pwm_out : out  STD_LOGIC);
 end pwm10bit;
 
@@ -72,6 +74,10 @@ signal adc_pulse: std_logic;
 
 begin
 
+	-- map to output and extend to 16 bits
+	adc_value <= "000000" & adc_out;
+	adc_valid <= adc_pulse;
+	
 	adc: MercuryADC port map
 			(
 				-- command input
